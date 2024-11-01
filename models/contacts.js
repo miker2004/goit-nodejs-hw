@@ -7,7 +7,7 @@ const contactsPath = './models/contacts.json';
 const validationSchema = Joi.object({
   name: Joi.string().alphanum().min(3).max(20).required(),
   email: Joi.string().email({ minDomainSegments: 2, tlds: { allow: ['com', 'pl'] } }).required(),
-  phone: Joi.number().integer().required(),
+  phone: Joi.string().required(),
 });
 
 async function listContacts() {
@@ -15,7 +15,7 @@ async function listContacts() {
     const data = await fs.readFile(contactsPath, 'utf8');
     return JSON.parse(data);
   } catch (err) {
-    console.error('Error reading contacts:', err.message);
+    throw new Error('Error reading contacts:', err.message);
   }
 }
 
@@ -24,7 +24,7 @@ async function getContactById(contactId) {
     const contacts = await listContacts();
     return contacts.find(contact => contact.id === contactId) || null;
   } catch (err) {
-    console.error(`Error finding contact with ID ${contactId}:`, err.message);
+    throw new Error(`Error finding contact with ID ${contactId}:`, err.message);
   }
 }
 
@@ -41,7 +41,7 @@ async function removeContact(contactId) {
     await fs.writeFile(contactsPath, JSON.stringify(updatedContacts, null, 2));
     console.log(`Contact with ID ${contactId} has been removed.`);
   } catch (err) {
-    console.error(`Error removing contact with ID ${contactId}:`, err.message);
+    throw new Error(`Error removing contact with ID ${contactId}:`, err.message);
   }
 }
 
@@ -65,7 +65,7 @@ async function addContact(name, email, phone) {
     console.log('Contact has been added:', newContact);
     return newContact;
   } catch (err) {
-    console.error('Error adding contact:', err.message);
+    throw new Error('Error adding contact:', err.message);
   }
 }
 
@@ -86,7 +86,7 @@ async function updateContact(contactId, body) {
     await fs.writeFile(contactsPath, JSON.stringify(contacts, null, 2));
     return updatedContact;
   } catch (err) {
-    console.error(`Error updating contact with ID ${contactId}:`, err.message);
+    throw new Error(`Error updating contact with ID ${contactId}:`, err.message);
   }
 }
 
