@@ -2,23 +2,21 @@ const express = require('express');
 const logger = require('morgan');
 const cors = require('cors');
 const mongoose = require('mongoose');
+require('dotenv').config(); 
 
 const contactsRouter = require('./routes/api/contacts');
 
 const app = express();
 
-const uri = 'mongodb+srv://dzanuszgames:il9xxngkjkAEgep0@personalfinancetracker.drflz.mongodb.net/';
+const uri = `mongodb+srv://${process.env.MONGO_USER}:${process.env.MONGO_PASSWORD}@${process.env.MONGO_CLUSTER}/${process.env.MONGO_DB}?retryWrites=true&w=majority`;
 
-mongoose.connect(uri, {
-  useNewUrlParser: true,
-  useUnifiedTopology: true,
-})
+mongoose.connect(uri)
   .then(() => console.log('Database connection successful'))
   .catch(err => {
     console.error('Database connection error:', err.message);
     process.exit(1);
   });
-
+  
 const formatsLogger = app.get('env') === 'development' ? 'dev' : 'short';
 
 app.use(logger(formatsLogger));
