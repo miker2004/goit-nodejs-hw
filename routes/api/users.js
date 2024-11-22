@@ -63,4 +63,22 @@ router.patch('/', auth, async (req, res) => {
   }
 });
 
+router.post('/logout', auth, async (req, res) => {
+  try {
+    const user = req.user;
+
+    if (!user || !user.token) {
+      return res.status(400).json({ message: 'Not authorized' });
+    }
+
+    user.token = null;
+    await user.save(); 
+
+    res.status(204).send(); 
+  } catch (error) {
+    res.status(500).json({ message: 'Server error' }); 
+  }
+});
+
+
 module.exports = router;

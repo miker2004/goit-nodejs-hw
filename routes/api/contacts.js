@@ -209,26 +209,23 @@ router.post(
 });
 
 
-router.get(
-  '/users/logout', 
-  auth, 
-  async (req, res, next) => {
-  try {
-    const user = req.user; 
+// router.get('/users/logout', auth, async (req, res, next) => {
+//   try {
+//     const user = req.user;
 
-    if (!user || !user.token) {
-      return res.status(401).json({ message: 'Not authorized' });
-    }
+//     if (!user || !user.token) {
+//       return res.status(401).json({ message: 'Not authorized' });
+//     }
 
-    user.token = null;
-    await user.save();
+//     user.token = null;
+//     await user.save();
 
-    res.status(204).send();
-  } catch (error) {
-    console.error('Error during logout:', error);
-    next(error);
-  }
-});
+//     res.status(204).send(); 
+//   } catch (error) {
+//     console.error('Error during logout:', error);
+//     next(error);
+//   }
+// });
 
 
 router.get(
