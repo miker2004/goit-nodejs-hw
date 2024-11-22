@@ -3,6 +3,7 @@ const router = express.Router();
 const jwt = require('jsonwebtoken');
 const User = require('../../models/user');
 const auth = require('../../middleware/auth');
+const Blacklist = require('../../models/blacklist');
 
 router.post('/signup', async (req, res, next) => {
   const { email, password } = req.body;
@@ -71,12 +72,15 @@ router.get('/logout', auth, async (req, res) => {
       return res.status(400).json({ message: 'Not authorized' });
     }
 
+    const blacklistedToken = new Blacklist({ token: user.token });
+    await blacklistedToken.save();
+
     user.token = null;
     await user.save(); 
 
-    res.status(204).send(); 
+    res.status(204).send();  
   } catch (error) {
-    res.status(500).json({ message: 'Server error' }); 
+    res.status(500).json({ message: 'Server error' });
   }
 });
 
