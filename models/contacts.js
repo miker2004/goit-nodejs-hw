@@ -5,7 +5,7 @@ const contactSchema = new mongoose.Schema({
   email: { type: String, required: true },
   phone: { type: String },
   favorite: { type: Boolean, default: false },
-  owner: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+  owner: { type: mongoose.Schema.Types.ObjectId, ref: 'User', require: true},
 });
 
 const Contact = mongoose.model('Contact', contactSchema);

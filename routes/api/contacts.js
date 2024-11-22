@@ -5,144 +5,145 @@ const Contact = require('../../models/contacts');
 const User = require('../../models/user');
 const auth = require('../../middleware/auth');
 
+router.get(
+  '/',
+  auth,
+  async (req, res, next) => {
+    try {
+      const { page = 1, limit = 20, favorite } = req.query;
+      const filter = {
+        owner: req.user.id,
+        ...(favorite !== undefined && { favorite: favorite === 'true' }),
+      };
+      const skip = (page - 1) * limit;
 
-router.get('/', async (req, res, next) => {
-  try {
-    const { page = 1, limit = 20, favorite } = req.query;
+      const contacts = await Contact.find(filter).skip(skip).limit(Number(limit));
+      const total = await Contact.countDocuments(filter);
 
-    const filter = favorite !== undefined ? { favorite: favorite === 'true' } : {};
-    const skip = (page - 1) * limit;
-    const contacts = await Contact.find(filter)
-      .skip(skip)
-      .limit(Number(limit));
-
-    const total = await Contact.countDocuments(filter);
-
-    res.json({
-      contacts,
-      total,
-      page: Number(page),
-      limit: Number(limit),
-    });
-  } catch (error) {
-    next(error);
-  }
-});
-
-router.patch('/', auth, async (req, res, next) => {
-  const { subscription } = req.body;
-  const validSubscriptions = ['starter', 'pro', 'business'];
-
-  try {
-    if (!validSubscriptions.includes(subscription)) {
-      return res.status(400).json({
-        message: `Invalid subscription. Allowed values: ${validSubscriptions.join(', ')}`,
+      res.json({
+        contacts,
+        total,
+        page: Number(page),
+        limit: Number(limit),
       });
+    } catch (error) {
+      next(error);
     }
-
-    const user = await User.findByIdAndUpdate(
-      req.user.id,
-      { subscription },
-      { new: true, runValidators: true }
-    );
-
-    if (!user) {
-      return res.status(404).json({ message: 'User not found' });
-    }
-
-    res.json({
-      email: user.email,
-      subscription: user.subscription,
-    });
-  } catch (error) {
-    next(error);
   }
-});
+);
 
-router.get('/:contactId', async (req, res, next) => {
-  try {
-    const { contactId } = req.params;
-    const contact = await Contact.findById(contactId);
+router.get(
+  '/:contactId',
+  auth,
+  async (req, res, next) => {
+    try {
+      const { contactId } = req.params;
+      const contact = await Contact.findOne({ _id: contactId, owner: req.user.id });
 
-    if (!contact) {
-      return res.status(404).json({ message: 'Contact not found' });
+      if (!contact) {
+        return res.status(404).json({ message: 'Contact not found' });
+      }
+
+      res.json(contact);
+    } catch (error) {
+      next(error);
     }
-
-    res.json(contact);
-  } catch (error) {
-    next(error);
   }
-});
+);
 
-router.post('/', async (req, res, next) => {
-  try {
-    const newContact = await Contact.create(req.body);
-    res.status(201).json(newContact);
-  } catch (error) {
-    next(error);
-  }
-});
-
-router.delete('/:contactId', async (req, res, next) => {
-  try {
-    const { contactId } = req.params;
-    const deletedContact = await Contact.findByIdAndDelete(contactId);
-
-    if (!deletedContact) {
-      return res.status(404).json({ message: 'Contact not found' });
+router.post(
+  '/',
+  auth,
+  async (req, res, next) => {
+    try {
+      const newContact = await Contact.create({
+        ...req.body,
+        owner: req.user.id,
+      });
+      res.status(201).json(newContact);
+    } catch (error) {
+      next(error);
     }
-
-    res.status(204).send();
-  } catch (error) {
-    next(error);
   }
-});
+);
 
-router.put('/:contactId', async (req, res, next) => {
-  try {
-    const { contactId } = req.params;
-    const updatedContact = await Contact.findByIdAndUpdate(contactId, req.body, {
-      new: true,
-      runValidators: true,
-    });
+router.delete(
+  '/:contactId',
+  auth,
+  async (req, res, next) => {
+    try {
+      const { contactId } = req.params;
+      const deletedContact = await Contact.findOneAndDelete({
+        _id: contactId,
+        owner: req.user.id,
+      });
 
-    if (!updatedContact) {
-      return res.status(404).json({ message: 'Contact not found' });
+      if (!deletedContact) {
+        return res.status(404).json({ message: 'Contact not found' });
+      }
+
+      res.status(204).send();
+    } catch (error) {
+      next(error);
     }
-
-    res.json(updatedContact);
-  } catch (error) {
-    next(error);
   }
-});
+);
 
-router.patch('/:contactId/favorite', async (req, res, next) => {
-  try {
-    const { contactId } = req.params;
-    const { favorite } = req.body;
+router.put(
+  '/:contactId',
+  auth,
+  async (req, res, next) => {
+    try {
+      const { contactId } = req.params;
+      const updatedContact = await Contact.findOneAndUpdate(
+        { _id: contactId, owner: req.user.id },
+        req.body,
+        { new: true, runValidators: true }
+      );
 
-    if (favorite === undefined) {
-      return res.status(400).json({ message: 'missing field favorite' });
+      if (!updatedContact) {
+        return res.status(404).json({ message: 'Contact not found' });
+      }
+
+      res.json(updatedContact);
+    } catch (error) {
+      next(error);
     }
-
-    const updatedContact = await Contact.findByIdAndUpdate(
-      contactId,
-      { favorite },
-      { new: true }
-    );
-
-    if (!updatedContact) {
-      return res.status(404).json({ message: 'Not found' });
-    }
-
-    res.status(200).json(updatedContact);
-  } catch (error) {
-    next(error);
   }
-});
+);
 
+router.patch(
+  '/:contactId/favorite',
+  auth,
+  async (req, res, next) => {
+    try {
+      const { contactId } = req.params;
+      const { favorite } = req.body;
 
-router.post('/users/signup', async (req, res, next) => {
+      if (favorite === undefined) {
+        return res.status(400).json({ message: 'Missing field favorite' });
+      }
+
+      const updatedContact = await Contact.findOneAndUpdate(
+        { _id: contactId, owner: req.user.id },
+        { favorite },
+        { new: true }
+      );
+
+      if (!updatedContact) {
+        return res.status(404).json({ message: 'Contact not found' });
+      }
+
+      res.status(200).json(updatedContact);
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
+router.post(
+  '/users/signup', 
+  async (req, res, next) => {
   const { email, password } = req.body;
   
   try {
@@ -173,7 +174,9 @@ router.post('/users/signup', async (req, res, next) => {
   }
 });
 
-router.post('/users/login', async (req, res, next) => {
+router.post(
+  '/users/login', 
+  async (req, res, next) => {
   const { email, password } = req.body;
 
   try {
@@ -206,29 +209,23 @@ router.post('/users/login', async (req, res, next) => {
 });
 
 
-router.get('/users/logout', auth, async (req, res) => {
+router.get(
+  '/users/logout', 
+  auth, 
+  async (req, res, next) => {
   try {
-    const user = await User.findById(req.user.id);
+    req.user.token = null;
+    await req.user.save();
 
-    if (!user) {
-      return res.status(401).json({
-        message: 'Not authorized',
-      });
-    }
-
-    user.token = null; 
-    await user.save();
-
-    return res.status(204).send(); 
+    res.status(204).send();
   } catch (error) {
-    console.error(error);
-    return res.status(500).json({
-      message: 'Server error',
-    });
+    next(error);
   }
 });
 
-router.get('/users/current', auth, (req, res) => {
+router.get(
+  '/users/current', 
+  auth, (req, res) => {
   const { email, subscription } = req.user;
 
   if (!email || !subscription) {
