@@ -214,14 +214,22 @@ router.get(
   auth, 
   async (req, res, next) => {
   try {
-    req.user.token = null;
-    await req.user.save();
+    const user = req.user; 
+
+    if (!user || !user.token) {
+      return res.status(401).json({ message: 'Not authorized' });
+    }
+
+    user.token = null;
+    await user.save();
 
     res.status(204).send();
   } catch (error) {
+    console.error('Error during logout:', error);
     next(error);
   }
 });
+
 
 router.get(
   '/users/current', 
