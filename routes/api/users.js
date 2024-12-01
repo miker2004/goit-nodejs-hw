@@ -4,6 +4,8 @@ const multer = require('multer');
 const path = require('path');
 const fs = require('fs/promises');
 const Jimp = require('jimp');
+const { v4: uuidv4 } = require('uuid');
+const nodemailer = require('nodemailer');
 const auth = require('../../middleware/auth');
 const User = require('../../models/user');
 
@@ -18,8 +20,26 @@ const storage = multer.diskStorage({
     cb(null, `${Date.now()}-${file.originalname}`);
   },
 });
+const upload = multer({ storage });  
 
-const upload = multer({ storage });
+const transporter = nodemailer.createTransport({
+  service: 'Gmail',
+  auth: {
+    user: process.env.EMAIL_USER,
+    pass: process.env.EMAIL_PASS,
+  },
+});
+
+const sendVerificationEmail = async (email, verificationToken) => {
+  const verificationLink = `${process.env.BASE_URL}/users/verify/${verificationToken}`;
+  await transporter.sendMail({
+    from: process.env.EMAIL_USER,
+    to: email,
+    subject: 'Email Verification',
+    html: `<p>Click the link below to verify your email:</p>
+           <a href="${verificationLink}">${verificationLink}</a>`,
+  });
+};
 
 router.post('/signup', async (req, res, next) => {
   const { email, password } = req.body;
@@ -108,7 +128,7 @@ router.patch('/avatars', auth, upload.single('avatar'), async (req, res) => {
     }
 
     const tmpFilePath = file.path;
-    const uniqueFileName = `${req.user._id}-${file.originalname}`;
+    const uniqueFileName = `${uuidv4()}-${file.originalname}`;
     const finalFilePath = path.join(avatarsDir, uniqueFileName);
 
     const image = await Jimp.read(tmpFilePath);
@@ -121,6 +141,54 @@ router.patch('/avatars', auth, upload.single('avatar'), async (req, res) => {
     await req.user.save();
 
     res.status(200).json({ avatarURL });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
+router.get('/users/verify/:verificationToken', async (req, res) => {
+  const { verificationToken } = req.params;
+
+  try {
+    const user = await User.findOne({ verificationToken });
+
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+
+    user.verificationToken = null;
+    user.verify = true;
+    await user.save();
+
+    res.status(200).json({ message: 'Verification successful' });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
+router.post('/users/verify', async (req, res) => {
+  const { email } = req.body;
+
+  if (!email) {
+    return res.status(400).json({ message: 'missing required field email' });
+  }
+
+  try {
+    const user = await User.findOne({ email });
+
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+
+    if (user.verify) {
+      return res.status(400).json({ message: 'Verification has already been passed' });
+    }
+
+    await sendVerificationEmail(user.email, user.verificationToken);
+
+    res.status(200).json({ message: 'Verification email sent' });
   } catch (error) {
     console.error(error);
     res.status(500).json({ message: 'Server error' });

@@ -18,6 +18,14 @@ const userSchema = new mongoose.Schema({
       return gravatar.url(this.email, { s: '200', d: 'retro' }, true);
     },
   },
+  verify: {
+    type: Boolean,
+    default: false,
+  },
+  verificationToken: {
+    type: String,
+    required: [true, 'Verify token is required'],
+  },
 }, { versionKey: false });
 
 userSchema.methods.setPassword = async function (password) {
