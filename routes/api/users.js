@@ -8,6 +8,7 @@ const { v4: uuidv4 } = require('uuid');
 const nodemailer = require('nodemailer');
 const auth = require('../../middleware/auth');
 const User = require('../../models/user');
+const Joi = require('joi');
 
 const router = express.Router();
 
@@ -32,14 +33,23 @@ const transporter = nodemailer.createTransport({
 
 const sendVerificationEmail = async (email, verificationToken) => {
   const verificationLink = `${process.env.BASE_URL}/users/verify/${verificationToken}`;
-  await transporter.sendMail({
-    from: process.env.EMAIL_USER,
-    to: email,
-    subject: 'Email Verification',
-    html: `<p>Click the link below to verify your email:</p>
-           <a href="${verificationLink}">${verificationLink}</a>`,
-  });
+  try {
+    await transporter.sendMail({
+      from: process.env.EMAIL_USER,
+      to: email,
+      subject: 'Email Verification',
+      html: `<p>Click the link below to verify your email:</p>
+             <a href="${verificationLink}">${verificationLink}</a>`,
+    });
+  } catch (error) {
+    console.error('Error sending verification email:', error.message);
+    throw new Error('Failed to send verification email');
+  }
 };
+
+const emailSchema = Joi.object({
+  email: Joi.string().email().required(),
+});
 
 router.post('/signup', async (req, res, next) => {
   const { email, password } = req.body;
@@ -50,9 +60,11 @@ router.post('/signup', async (req, res, next) => {
       return res.status(409).json({ message: 'Email is already in use' });
     }
 
-    const newUser = new User({ email });
+    const verificationToken = uuidv4();
+    const newUser = new User({ email, verificationToken });
     await newUser.setPassword(password);
     await newUser.save();
+    await sendVerificationEmail(email, verificationToken);
 
     res.status(201).json({
       email: newUser.email,
@@ -147,7 +159,7 @@ router.patch('/avatars', auth, upload.single('avatar'), async (req, res) => {
   }
 });
 
-router.get('/users/verify/:verificationToken', async (req, res) => {
+router.get('/auth/verify/:verificationToken', async (req, res) => {
   const { verificationToken } = req.params;
 
   try {
@@ -163,7 +175,7 @@ router.get('/users/verify/:verificationToken', async (req, res) => {
 
     res.status(200).json({ message: 'Verification successful' });
   } catch (error) {
-    console.error(error);
+    console.error('Error in /auth/verify:', error.message);
     res.status(500).json({ message: 'Server error' });
   }
 });
@@ -171,8 +183,10 @@ router.get('/users/verify/:verificationToken', async (req, res) => {
 router.post('/users/verify', async (req, res) => {
   const { email } = req.body;
 
-  if (!email) {
-    return res.status(400).json({ message: 'missing required field email' });
+  // Validate request body
+  const { error } = emailSchema.validate({ email });
+  if (error) {
+    return res.status(400).json({ message: error.details[0].message });
   }
 
   try {
@@ -183,14 +197,16 @@ router.post('/users/verify', async (req, res) => {
     }
 
     if (user.verify) {
-      return res.status(400).json({ message: 'Verification has already been passed' });
+      return res
+        .status(400)
+        .json({ message: 'Verification has already been passed' });
     }
 
     await sendVerificationEmail(user.email, user.verificationToken);
 
     res.status(200).json({ message: 'Verification email sent' });
   } catch (error) {
-    console.error(error);
+    console.error('Error in /users/verify:', error.message);
     res.status(500).json({ message: 'Server error' });
   }
 });
