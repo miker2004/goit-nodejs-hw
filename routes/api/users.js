@@ -81,7 +81,16 @@ router.post('/login', async (req, res, next) => {
 
   try {
     const user = await User.findOne({ email });
-    if (!user || !user.validPassword(password)) {
+
+    if (!user) {
+      return res.status(400).json({ message: 'Incorrect email or password' });
+    }
+
+    if (!user.verify) {
+      return res.status(400).json({ message: 'Email is not verified. Please check your inbox.' });
+    }
+
+    if (!user.validPassword(password)) {
       return res.status(400).json({ message: 'Incorrect email or password' });
     }
 
